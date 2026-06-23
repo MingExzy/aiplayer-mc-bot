@@ -1,0 +1,10 @@
+node_modules/
+EembeddingModelFiles/
+.vscode/
+.reasonix/
+Python/__pycache__/
+Python/skills/
+*.pyc
+test_plan.txt
+ppt_content.txt
+ItemsData/minecraft-data-data-pc.zip

@@ -6,6 +6,7 @@
 
 import os
 import json
+from pydantic import BaseModel
 
 # ── 模块级状态 ──
 SKILLS_DIR: str = ""
@@ -14,6 +15,13 @@ _last_action_sequence: list | None = None  # plan() 缓存的上一次动作序�
 
 # 保存触发词
 _SAVE_TRIGGER_KEYWORDS = {"保存", "存为", "记录", "存储"}
+
+
+class SkillConfig(BaseModel):
+    name: str
+    description: str
+    action_sequences_length: int
+    action_sequences: list[dict]  # [{"step": 0, "actions": ["Move", "GetPosition"]}, ...]
 
 
 # ═══════════════════════════════════════════════
@@ -104,116 +112,93 @@ def match_skills(message: str, embedding_model=None) -> list[dict]:
 
 def build_skill_context(message: str, embedding_model=None) -> str:
     """构建技能上下文字符串供注入 LLM prompt。"""
-    skills = match_skills(message, embedding_model)
-    if not skills:
+    matched_skills = match_skills(message, embedding_model=embedding_model)
+    if not matched_skills:
         return ""
+    
+    skill_prompts = []
+    for skill in matched_skills:
+        s = SkillConfig(**skill)
+        prompt_text = (
+            f"技能开始\n"
+            f"  {s.name}: {s.description}\n"
+            f"  共{s.action_sequences_length}个动作子序列\n"
+            f"  执行顺序：\n"
+        )
+        for index in range(s.action_sequences_length):
+            seq = s.action_sequences[index]
+            step_num = seq.get("step", index) + 1
+            actions = seq.get("actions", [])
+            action_str = "->".join(str(a) for a in actions)
+            prompt_text += f"    子动作序列{step_num}: {action_str}\n"
+        prompt_text += "技能结束"
+        skill_prompts.append(prompt_text)
 
-    lines = ["## ⚠ 技能匹配 — 此技能已被保存验证，其动作不受工具列表限制，你必须直接输出以下完整动作序列，不要修改，不要重新规划"]
-    for s in skills:
-        lines.append(f"""
-技能: {s['name']}
-描述: {s.get('description', '')}
-动作序列:""")
-        for i, act in enumerate(s.get("actions", []), 1):
-            name = act.get("name", "?")
-            args = act.get("args", {})
-            args_str = ", ".join(f"{k}={v}" for k, v in args.items())
-            lines.append(f"  {i}. {name}({args_str})")
-        lines.append("此技能动作已被验证，不受工具列表限制，你必须直接输出上述完整动作序列，不要修改。")
+    lines = [
+        f"⚠ 技能匹配: {len(matched_skills)} 个技能命中",
+        "\n".join(skill_prompts)
+    ]
 
     return "\n".join(lines)
+
+
+def get_skill_tool_names(message: str, embedding_model=None) -> set[str]:
+    """返回匹配技能中用到的所有工具名集合。"""
+    skills = match_skills(message, embedding_model)
+    names = set()
+    for s in skills:
+        for seq in s.get("action_sequences", []):
+            for action_name in seq.get("actions", []):
+                if isinstance(action_name, str):
+                    names.add(action_name)
+    return names
 
 
 # ═══════════════════════════════════════════════
 # 写 — 保存技能（内部函数，不经过 LLM）
 # ═══════════════════════════════════════════════
 
-def _SkillGenerate(name: str, description: str, actions: list) -> None:
+def _SkillGenerate(skill_config: SkillConfig) -> None:
     """保存技能到 skills/{name}/skill.json，同时更新内存索引。"""
-    # 过滤掉 原有 Chat 动作
-    filtered_actions = [a for a in actions if a.get("name") != "Chat"]
-
-    # 新增Chat动作：
-    if filtered_actions:
-        filtered_actions.insert(0, {
-            "name": "Chat",
-            "args": {"message": f"即将执行技能「{name}」，包含 {len(filtered_actions)} 个动作。"}
-        })
-        filtered_actions.append({
-            "name": "Chat",
-            "args": {"message": f"技能「{name}」执行完毕。"}})
-    skill_data = {
-        "name": name,
-        "description": description or "",
-        "actions": filtered_actions,
-        "rules": "当你读取并决定采用这项 skill 时，直接输出上述 actions 作为结果，无需额外的 Chat 输出或决策。",
-    }
+    name = skill_config.name.strip()
+    if not name:
+        raise ValueError("技能名称不能为空")
 
     skill_dir = os.path.join(SKILLS_DIR, name)
     os.makedirs(skill_dir, exist_ok=True)
 
     with open(os.path.join(skill_dir, "skill.json"), "w", encoding="utf-8") as f:
-        json.dump(skill_data, f, ensure_ascii=False, indent=2)
+        json.dump(skill_config.model_dump(), f, ensure_ascii=False, indent=2)
 
     # 更新内存索引
     global _skill_index
     _skill_index = [s for s in _skill_index if s.get("name") != name]
-    _skill_index.append(skill_data)
+    _skill_index.append(skill_config.model_dump())  
 
-    print(f"[skill] 已保存: {name} ({len(filtered_actions)} 个动作)")
+    print(f"[skill] 已保存: 技能{name})")
 
 
-def check_save_skill(latest_message: str, chatHistory: list) -> str | None:
-    """检测玩家是否请求保存技能。命中时直接保存并返回确认消息（plan 以此短路 LLM 调用）。"""
-    if not latest_message:
-        return None
-
-    msg = latest_message.strip()
-
-    # 去掉 "username: " 前缀，提取实际消息内容
-    colon_idx = msg.find(': ')
-    if colon_idx > 0:
-        msg = msg[colon_idx + 2:]
-
-    # 检查触发词开头
-    matched_trigger = None
-    for kw in _SAVE_TRIGGER_KEYWORDS:
-        if msg.startswith(kw):
-            matched_trigger = kw
-            break
-    if not matched_trigger:
-        return None
-
-    # 提取技能名
-    skill_name = msg[len(matched_trigger):].strip()
-    if not skill_name:
-        skill_name = f"skill_{len(_skill_index) + 1}"
-
-    # 从历史中提取原始请求作为 description
-    description = ""
-    for entry in reversed(chatHistory):
-        if entry.get("role") == "player":
-            player_msg = entry.get("content", "").strip()
-            # 去掉 "username: " 前缀
-            colon_idx = player_msg.find(': ')
-            if colon_idx > 0:
-                player_msg = player_msg[colon_idx + 2:]
-            is_save_req = any(player_msg.startswith(kw) for kw in _SAVE_TRIGGER_KEYWORDS)
-            if not is_save_req:
-                description = player_msg[:80]
-                break
-
-    # 从缓存中获取最近一次动作序列
-    global _last_action_sequence
-    actions_to_save = _last_action_sequence or []
+def check_save_skill(llm_saveskill_output: str) -> str | None:
+    """校验输出结果并尝试保存技能"""
 
     try:
-        _SkillGenerate(skill_name, description, actions_to_save)
-        print(f"[skill] 已保存技能: {skill_name}")
-        return f"已自动保存技能「{skill_name}」，下次可以直接复用。"
+        raw_dict = json.loads(llm_saveskill_output)
+    except json.JSONDecodeError as e:
+        raise ValueError("LLM 输出不是有效的 JSON")
+
+    try:
+        skill_config = SkillConfig(**raw_dict)
     except Exception as e:
-        print(f"[skill] 保存失败: {e}")
-        return f"保存失败: {e}"
+        raise ValueError(f"LLM 输出不符合 SkillConfig 结构: {e}")
+    
+    # 强制转换 action_sequences_length 为 int和实际长度，避免LLM输出错误
+    skill_config.action_sequences_length = len(skill_config.action_sequences)
+    for seq in skill_config.action_sequences:
+        # 强制设置 step 为实际索引，避免LLM输出错误
+        seq["step"] = skill_config.action_sequences.index(seq)
+
+    _SkillGenerate(skill_config)
+    return f"技能 {skill_config.name} 已保存成功"
 
 
 # ═══════════════════════════════════════════════

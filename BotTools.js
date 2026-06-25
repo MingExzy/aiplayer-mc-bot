@@ -64,6 +64,45 @@ const tools = [
 ]
 
 
+
+async function SaveSkills(Bot,skill_name) {
+    if (typeof fetch !== 'function') {
+    throw new Error('当前运行环境不支持 fetch')
+  }
+
+  // 发给 MCP 的 payload 也是标准 JSON，history 会保留前面统一好的消息结构。
+  const response = await fetch(MCP_PLAN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      'Mcp-Session-Id': mcpSessionId
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'tools/call',
+      params: {
+        name: 'saveSkills',
+        arguments: {
+          chatHistory: getHistory(),
+          skill_name: skill_name
+        }
+      },
+      id:3,
+    }),
+    signal: AbortSignal.timeout(30000)
+  })
+
+  console.log('发送给 saveSkills 的参数:', JSON.stringify({ chatHistory: getHistory(), skill_name }, null, 2));
+  const text = await response.text()
+  if (!response.ok) {
+    throw new Error(`MCP 服务器返回 ${response.status}: ${text}`)
+  }
+  else{
+    Bot.chat(`技能 ${skill_name} 已保存成功！`)
+    addToHistory("system", `技能 ${skill_name} 已保存成功！`)
+  }
+}
 // const AdvancedControlTools = [
 //     {name:"BuildPillar", args:["Block","bottomIndex","height"], class:"AdvancedControlTools",
 //         description: "Build a pillar with specific block type, bottomIndex is the index of the bottom block: 0-8, [[0,1,2],[3,4,5],[6,7,8]], 4 is the bottom block of the bot. cannot build above the bot, height is the height of the pillar, less than 3"},
@@ -468,4 +507,5 @@ module.exports = {
     GetBotTools,
     QueryTools,
     tools,
+    SaveSkills,
 }

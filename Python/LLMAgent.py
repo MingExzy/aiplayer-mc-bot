@@ -111,7 +111,8 @@ def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
 - 参数名和取值必须匹配该工具的 args 定义
 - **禁止**编造不存在的工具或参数值
 - 每个动作必须能从聊天历史中找到合理依据
-- **例外**：如果「当前已知信息」中提供了已保存的技能（以 ⚠ 技能匹配 开头），技能中的工具不受上述限制，必须直接输出完整动作序列
+- 如果「当前已知信息」中提供了已保存的技能（以 ⚠ 技能匹配 开头），优先推荐执行技能，并安装技能子动作序列依次填入参数并生成动作序列
+- 如果技能的完整动作序列中不以Chat开头或结尾，请你在执行前后各加一个Chat动作，开头告知玩家"开始执行技能"，结尾告知玩家"技能执行完毕"，以满足 R5a 规则
 
 ## R4 — 闲聊处理
 当玩家只是闲聊、提问、或没有明确动作需求时 → 只输出一个 `Chat` 动作，不要画蛇添足加其他工具。
@@ -213,6 +214,66 @@ def summarize_history(chatHistory: list) -> str:
 
     raw = _llm.get_response([{"role": "system", "content": prompt}])
     return raw.strip()
+
+
+def generate_skill(chatHistory: list, skill_name: str) -> str:
+    """用 LLM 总结保存技能。"""
+    history_json = json.dumps(chatHistory, ensure_ascii=False, indent=2)
+
+    prompt = f"""请根据以下聊天历史，保存技能 "{skill_name}"，要求如下：
+    ## R1 - 输出格式（严格Json，无多余解释内容）：
+      {{
+        "name": "{skill_name}",
+        "description": "...",
+        "action_sequences_length": N,
+        "action_sequences": [
+            {{"step": 0, "actions": [func1, func2, ..., funcK_1]}},
+            {{"step": 1, "actions": [func1, func2, ..., funcK_2]}},
+            ...
+            {{"step": N-1, "actions": [func1, func2, ..., funcK_N]}}
+        ]
+      }}
+    
+    ## R2 - 规则：
+    - action_sequences内部包含多个子动作序列，每一个子动作序列包含一个执行索引step和一个动作列表actions，动作列表中每个元素都是一个动作的名称，可以重复。
+    - actions中每个动作只是工具函数名，且必须是聊天历史中出现的系统执行输出的工具函数名，其参数args不需要保存
+    - step表示该子动作序列在技能中的索引位置和执行顺序，从 0 开始，
+    - description 字段请简要描述该技能的用途和功能，控制在 100 字以内。
+    - 在提取动作并确定每一个动作子序列时，若出现查询类工具时，必须以此查询工具结尾，完成一个动作子序列生成，然后在下一个动作子序列中继续划分后续动作。
+    - 以玩家的最近消息作为意图参考，不要编造玩家意图，不要保存与玩家意图无关的动作。
+    - 请直接输出 JSON，不要多余格式或解释。
+    正确示例：
+    {{
+        "name": "{skill_name}",
+        "description": "这是一个示例技能",
+        "action_sequences_length": 2,
+        "action_sequences": [
+            {{"step": 0, "actions": ["Move", "GetPosition"]}},
+            {{"step": 1, "actions": ["BreakBlock", "PlaceBlock"]}}
+        ]
+    }}
+
+    错误示例（划分子动作序列时遇到查询工具不结尾）：
+    {{
+        "name": "{skill_name}",
+        "description": "这是一个示例技能",
+        "action_sequences_length": 2,
+        "action_sequences": [
+            {{"step": 0, "actions": ["Move", "GetPosition","BreakBlock"]}},
+            {{"step": 1, "actions": ["PlaceBlock"]}}
+        ]
+    }}
+    聊天历史：
+{history_json}
+"""
+    raw = _llm.get_response([{"role": "system", "content": prompt}])
+    parsed = parse_json_candidate(raw)
+
+    if not isinstance(parsed, dict) or 'name' not in parsed or 'action_sequences' not in parsed:
+        raise ValueError('LLM 未返回包含 name 和 action_sequences 字段的 JSON')
+    
+    return json.dumps(parsed, ensure_ascii=False)
+
 
 
 if __name__ == '__main__':

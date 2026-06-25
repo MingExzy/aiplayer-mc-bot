@@ -5,8 +5,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from keyword_matcher import keyword_match
 from item_query import init as init_items, build_item_context
-from skill_manager import init as init_skills, build_skill_context, check_save_skill, cache_action_sequence
-import tiktoken
+from skill_manager import init as init_skills, build_skill_context, check_save_skill, cache_action_sequence, get_skill_tool_names
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,13 +43,6 @@ def make_decision(chatHistory, tools, extra_context=""):
 def plan(chatHistory, tools):
     latest_message = chatHistory[-1]['content'] if chatHistory else ""
 
-    # ── 短路：保存技能（不经过 LLM）──
-    save_result = check_save_skill(latest_message, chatHistory)
-    if save_result:
-        return json.dumps({
-            "actions": [{"name": "Chat", "args": {"message": save_result}}]
-        }, ensure_ascii=False)
-
     # ── 上下文构建 ──
     item_context = build_item_context(latest_message, embedding_model)
     skill_context = build_skill_context(latest_message, embedding_model)
@@ -59,6 +51,16 @@ def plan(chatHistory, tools):
 
     # ── 工具筛选 ──
     filtered_tools = filter_tools(latest_message, tools)
+
+    # ── 技能工具补全 ──
+    if skill_context:
+        skill_tool_names = get_skill_tool_names(latest_message, embedding_model)
+        if skill_tool_names:
+            existing_names = {t["name"] for t in filtered_tools}
+            added = [t for t in tools if t["name"] in skill_tool_names and t["name"] not in existing_names]
+            if added:
+                filtered_tools.extend(added)
+                print(f"补入技能工具: {[t['name'] for t in added]}")
 
     # ── 决策 ──
     action_json_str = make_decision(chatHistory, filtered_tools, extra_context=extra_context)
@@ -126,6 +128,16 @@ def summarize(chatHistory: list) -> str:
     except Exception as e:
         return f"总结生成失败: {e}"
 
+
+@mcp.tool()
+def saveSkill(chatHistory, skill_name: str) -> str:
+    """根据聊天历史和技能名称生成并保存技能。"""
+    try:
+        from LLMAgent import generate_skill
+        result = generate_skill(chatHistory, skill_name)
+        return check_save_skill(result)
+    except Exception as e:
+        return f"技能保存失败: {e}"
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http", host="127.0.0.1", port=8001)

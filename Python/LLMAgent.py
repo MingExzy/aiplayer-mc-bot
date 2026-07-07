@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 import os
 import json
 import re
@@ -8,10 +8,10 @@ class LLMClient:
     def __init__(self, model_name: str, url: str, api_key: str) -> None:
         self.model_name: str = model_name
         self.url: str = url
-        self.client = OpenAI(api_key=api_key, base_url=url)
+        self.client = AsyncOpenAI(api_key=api_key, base_url=url)
 
-    def get_response(self, messages: list) -> str:
-        response = self.client.chat.completions.create(
+    async def get_response(self, messages: list) -> str:
+        response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             stream=False
@@ -33,12 +33,18 @@ _llm = LLMClient(
 
 
 def parse_json_candidate(text: str):
-    """从 LLM 回复中提取 JSON 区块并解析。支持 ```json ``` 包裹或从首尾大括号/中括号截取。"""
+    """从 LLM 回复中提取 JSON 区块并解析。兼容单引号、代码块包裹、首尾括号截取。"""
     fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.I)
     source = fenced.group(1) if fenced else text
 
+    # 尝试直接解析（兼容单引号）
     try:
         return json.loads(source)
+    except json.JSONDecodeError:
+        try:
+            return json.loads(source.replace("'", '"'))
+        except Exception:
+            pass
     except Exception:
         first_brace = source.find('{')
         first_bracket = source.find('[')
@@ -51,10 +57,14 @@ def parse_json_candidate(text: str):
         if end <= start:
             raise ValueError('LLM 回复 JSON 边界不完整')
 
-        return json.loads(source[start:end + 1])
+        extracted = source[start:end + 1]
+        try:
+            return json.loads(extracted)
+        except json.JSONDecodeError:
+            return json.loads(extracted.replace("'", '"'))
 
 
-def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
+async def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
     """根据聊天历史调用 LLM，返回严格的动作 JSON（序列化的字符串）。
 
     本函数会构建与原 `mcp.make_decision` 相同的提示词，调用 OpenAI，然后解析并返回 LLM 给出的 JSON。
@@ -80,88 +90,71 @@ def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
 """
 
     prompt = f"""# 角色
-
-你是 AIPlayer，一个 Minecraft 机器人。你的任务是分析聊天历史，输出**下一轮**要执行的工具动作序列。
-
----
-
-# 输出格式（严格 JSON，无注释无解释）
-
-{{
-    "actions": [
-        {{"name": "Chat", "args": {{"message": "..."}}}},
-        ...
-    ]
-}}
+你是 AIPlayer，一个 Minecraft 机器人，输出下一轮要执行的动作序列。
 
 ---
 
-# 规则（按优先级排列）
+# 输出格式（严格 JSON）
+{{{{"actions": [{{{{"name":"Chat","args":{{{{"message":"..."}}}}}}}}], "continue": true/false, "skillProgress": null/{{{{"name":"技能名","next":索引}}}}}}}}
+
+---
+
+# 规则
 
 ## R1 — 身份
-- 你在聊天历史中身份是 **"bot"**（名字 AIPlayer）
-- 玩家消息 role="player"，系统消息 role="system"
-- 所有 role="bot" 的历史条目都是你之前的输出，请参考它们保持行为一致
+- 你是 "bot"（名字 AIPlayer）role=bot
+- role=player 是玩家，role=system 是系统
 
 ## R2 — 纯 JSON
-- 输出**只有** JSON，无自然语言、无代码块包裹、无注释
+- 只有 JSON，无解释、无注释
 
-## R3 — 工具合法性（防幻觉）
+## R3 — 工具合法性
 - 工具名必须来自下面的「可选工具列表」
-- 参数名和取值必须匹配该工具的 args 定义
-- **禁止**编造不存在的工具或参数值
-- 每个动作必须能从聊天历史中找到合理依据
-- 如果「当前已知信息」中提供了已保存的技能（以 ⚠ 技能匹配 开头），优先推荐执行技能，并安装技能子动作序列依次填入参数并生成动作序列
-- 如果技能的完整动作序列中不以Chat开头或结尾，请你在执行前后各加一个Chat动作，开头告知玩家"开始执行技能"，结尾告知玩家"技能执行完毕"，以满足 R5a 规则
+- 禁止编造不存在的工具
 
-## R4 — 闲聊处理
-当玩家只是闲聊、提问、或没有明确动作需求时 → 只输出一个 `Chat` 动作，不要画蛇添足加其他工具。
+## R4 — 技能执行
+- 当处于非技能续行阶段时，只有当玩家的需求比较明确地指向或者与某个已保存的技能高度相关时，才考虑使用技能
+- 玩家只是打招呼、自我介绍、无意义内容或空消息时，不要执行任何技能，直接输出 Chat
+- 执行技能时，严格按照「当前已知信息」中提供的子序列输出动作，不得修改、不得跳过、不得添加额外动作
+- 如果明确告知是技能续行阶段，必须执行续行子序列
+- 如果该技能还有后续子序列，输出正确的 skillProgress 和 continue=true
+- 如果这是最后一个子序列，skillProgress=null，continue=false
 
-正确例子：{{"actions": [{{"name": "Chat", "args": {{"message": "我在出生点附近"}}}}]}}
+## R5 — 动作序列截断
+- 1.遇到查询类工具时，该工具必须是 actions 中最后一个，且 continue=true
+- 2.当 actions 中已累计 10 个动作时，必须在此截断输出，continue 根据任务是否完成决定
 
-## R5 — 动作序列规则（核心）
+## R6 — Chat 包裹
+- 非续行场景：序列必须用 Chat 开头告知开始，Chat 结尾告知完成（除开R5中的规则1），中途不输出 Chat
+- 续行场景：根据技能要求进行chat处理。
 
-### R5a — 必须用 Chat 包裹
-序列必须**以 Chat 开头，以 Chat 结尾**。除非序列只有单个 Chat以及存 在查询的（R4、R5b 场景）。
+## R7 — 错误处理
+- 错误由系统自动处理，你不需要在输出中处理失败情况
 
-- **开头 Chat**：告知玩家"开始执行"
-- **结尾 Chat**：告知玩家完成情况或下一步提示
-
-### R5b — 查询类工具的使用限制
-当序列中出现**查询类工具**（class="QueryTools"，且描述带"Query"字样）时：
-- 查询工具后面不得再出现其他任意工具
-- 
-
-正确（查询后结束）：
-{{"actions": [
-    {{"name": "GetPosition", "args": {{}}}},
-]}}
-
-错误（查询后面还加任意动作）：
-{{"actions": [
-    {{"name": "GetPosition", "args": {{}}}},
-    {{"name": "Move", "args": {{"direction": "forward", "blocks": 5}}}},
-    {{"name": "Chat", "args": {{"message": "..."}}}}
-]}}
-
-## R6 — 错误处理（你不需要管）
-- 任何工具执行失败时，系统会自动将错误信息以聊天形式反馈给你
-- **不要在动作序列中处理失败情况**，只管规划"正常情况下"的流程
-
-## R7 — 结尾 Chat 的 message 策略
-结尾 Chat 的 message 应该写**预期执行成功后**的汇报内容，不要写"如果失败"之类的条件分支。
-- 例如执行（如 Move, BreakBlock, PlaceBlock...）+ Chat（结尾） → 告知完成情况或下一步提示
+## R8 — 历史数据时效性
+- 坐标/位置信息超过 10 秒不可靠，需重新查询
+- 实体/怪物信息超过 15 秒不可靠，需重新查询
+- 血量/状态信息超过 30 秒不可靠，需重新查询
+- 背包/物品信息超过 60 秒不可靠，建议重新查询
+- 配方信息玩家消息始终有效
 
 ---
 
-## R8 -历史聊天记录的可用时限规则：
-每条历史消息会带有一个时间戳（ts，单位秒）。以最新消息的时间戳为基准，根据消息类型不同，超过一定时间后可能不再可靠，不能复用，需要重新查询：
-- 坐标/位置类信息超过10秒，则不再可靠，不能复用，需要时必须重新查询
-- 实体/怪物信息超过15秒，则不再可靠，不能复用，需要时必须重新查询
-- 血量/状态类信息超过30秒，则不再可靠，不能复用，需要时必须重新查询
-- 背包/物品类信息超过60秒，可能已经过时，需要时建议重新查询
-- 合成配方信息始终有效，不受时限影响
-- 玩家消息始终有效，不受时限影响
+# 示例
+
+## 正常执行
+{{{{"actions":[{{{{"name":"Chat","args":{{{{"message":"开始检查"}}}}}}}},{{{{"name":"GetState","args":{{{{}}}}}}}}],"continue":false,"skillProgress":null}}}}
+
+## 技能续行（还有后续子序列）
+{{{{"actions":[{{{{"name":"Chat","args":{{{{"message":"继续执行"}}}}}}}},{{{{"name":"Move","args":{{{{"direction":"forward","blocks":5}}}}}}}}],"continue":true,"skillProgress":{{{{"name":"转圈","next":1}}}}}}}}
+
+## 技能最后一个子序列
+{{{{"actions":[{{{{"name":"Chat","args":{{{{"message":"继续执行"}}}}}}}}],"continue":false,"skillProgress":null}}}}
+
+## 查询工具截断
+{{{{"actions":[{{{{"name":"GetPosition","args":{{{{}}}}}}}}],"continue":true,"skillProgress":null}}}}
+
+
 
 # 总结：动作序列的三种基本形态
 
@@ -186,7 +179,7 @@ def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
 
     messages = [{"role": "system", "content": prompt}]
 
-    raw = _llm.get_response(messages)
+    raw = await _llm.get_response(messages)
     parsed = parse_json_candidate(raw)
 
     if not isinstance(parsed, dict) or 'actions' not in parsed:
@@ -196,27 +189,27 @@ def decide(chatHistory: list, tools: list, extra_context: str = "") -> str:
     return json.dumps(parsed, ensure_ascii=False)
 
 
-def summarize_history(chatHistory: list) -> str:
+async def summarize_history(chatHistory: list) -> str:
     """用 LLM 总结会话内容，用于跨会话记忆持久化。"""
     history_json = json.dumps(chatHistory, ensure_ascii=False, indent=2)
 
     prompt = f"""请用中文简要总结这次 Minecraft 游戏会话的关键信息，控制在 100 字以内。
 
 关注点：
-- 玩家做了什么
-- 达成了什么目标
-- 有哪些未完成的事
+- 你是谁
+- 玩家做了什么（要求你做了什么）
+- 达成了什么目标（做了哪些事情，做的怎么样）
 
 聊天历史：
 {history_json}
 
 请直接输出总结内容，不要多余格式。"""
 
-    raw = _llm.get_response([{"role": "system", "content": prompt}])
+    raw = await _llm.get_response([{"role": "system", "content": prompt}])
     return raw.strip()
 
 
-def generate_skill(chatHistory: list, skill_name: str) -> str:
+async def generate_skill(chatHistory: list, skill_name: str) -> str:
     """用 LLM 总结保存技能。"""
     history_json = json.dumps(chatHistory, ensure_ascii=False, indent=2)
 
@@ -266,7 +259,7 @@ def generate_skill(chatHistory: list, skill_name: str) -> str:
     聊天历史：
 {history_json}
 """
-    raw = _llm.get_response([{"role": "system", "content": prompt}])
+    raw = await _llm.get_response([{"role": "system", "content": prompt}])
     parsed = parse_json_candidate(raw)
 
     if not isinstance(parsed, dict) or 'name' not in parsed or 'action_sequences' not in parsed:

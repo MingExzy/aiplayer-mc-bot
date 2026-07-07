@@ -1,143 +1,94 @@
 from fastmcp import FastMCP
 import json
 import os
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-from keyword_matcher import keyword_match
-from item_query import init as init_items, build_item_context
-from skill_manager import init as init_skills, build_skill_context, check_save_skill, cache_action_sequence, get_skill_tool_names
+from skill_manager import init as init_skills, build_skill_context, check_save_skill, list_all_skills, query_skill_detail
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# ── 启动时初始化 ──
-init_items(os.path.join(script_dir, "../ItemsData/item/items.json"))
 init_skills(os.path.join(script_dir, "skills"))
 
-# ── 嵌入模型 ──
-local_model_path = os.path.join(script_dir, "../EembeddingModelFiles/paraphrase-multilingual-MiniLM-L12-v2")
-print(f"正在加载模型，路径: {local_model_path}")
-try:
-    embedding_model = SentenceTransformer(local_model_path, local_files_only=True)
-    print("模型加载成功")
-except OSError as e:
-    print(f"✗ 模型加载失败: {e}")
-    embedding_model = None
+# ── 加载 tools.json ──
+_tools_path = os.path.join(script_dir, "..", "tools.json")
+with open(_tools_path, "r", encoding="utf-8") as f:
+    _tools_data = json.load(f)
+print(f"加载了 {len(_tools_data)} 个原子工具")
+
+_skill_summaries = list_all_skills()
+print(f"加载了 {len(_skill_summaries)} 个技能")
 
 mcp = FastMCP(name="minecraft-bot", version="1.0.0")
 
 
-def make_decision(chatHistory, tools, extra_context=""):
-    """调用 LLMAgent 决策并返回动作 JSON 字符串。"""
+@mcp.tool()
+async def plan(chatHistory, skill_progress: str = ""):
+    # ── 技能续行 ──
+    if skill_progress:
+        try:
+            progress = json.loads(skill_progress)
+        except Exception:
+            progress = None
+        if progress:
+            name = progress.get("name", "")
+            next_seq = progress.get("next", 0)
+            skill_detail = query_skill_detail(name)
+            if not skill_detail:
+                return json.dumps({"actions": [{"name": "Chat", "args": {"message": f"技能 {name} 未找到"}}]})
+            current_seq = skill_detail["action_sequences"][next_seq]
+            used_tools = set(current_seq.get("actions", []))
+            used_tools.add("Chat")
+            tool_details = [t for t in _tools_data if t["name"] in used_tools]
+            skill_context = build_skill_context(name, next_seq)
+            ctx = skill_context
+            ctx += "\n\n你正在执行已保存的技能（续行），必须严格按照技能要求输出动作，不可修改、不可跳过、不可添加额外步骤。"
+            if tool_details:
+                ctx += "\n\n可用工具详情：\n" + "\n".join(
+                    f"{t['name']}: args={t['args']} — {t['description']}" for t in tool_details
+                )
+            from LLMAgent import decide
+            return await decide(chatHistory, tool_details, ctx)
+
+    # ── 正常执行 ──
+    # 所有工具全部加载
+    all_tools = _tools_data
+
+    # 技能摘要（名称 + 描述 + 第一个子序列）
+    skill_text = ""
+    if _skill_summaries:
+        lines = ["已保存技能："]
+        for s in _skill_summaries:
+            skill_ctx = build_skill_context(s["name"], 0)
+            lines.append(skill_ctx)
+        skill_text = "\n".join(lines)
+
+    ctx = skill_text if skill_text else ""
+
+    from LLMAgent import decide
     try:
-        from LLMAgent import decide
-        return decide(chatHistory, tools, extra_context=extra_context)
+        result_str = await decide(chatHistory, all_tools, ctx)
     except Exception as e:
-        return json.dumps({"error": str(e)}, ensure_ascii=False)
-
-
-# ═══════════════════════════════════════════════
-# MCP 工具: plan（唯一对外接口）
-# ═══════════════════════════════════════════════
-
-@mcp.tool()
-def plan(chatHistory, tools):
-    latest_message = chatHistory[-1]['content'] if chatHistory else ""
-
-    # ── 上下文构建 ──
-    item_context = build_item_context(latest_message, embedding_model)
-    skill_context = build_skill_context(latest_message, embedding_model)
-    extra_parts = [p for p in [item_context, skill_context] if p]
-    extra_context = "\n\n---\n\n".join(extra_parts) if extra_parts else ""
-
-    # ── 工具筛选 ──
-    filtered_tools = filter_tools(latest_message, tools)
-
-    # ── 技能工具补全 ──
-    if skill_context:
-        skill_tool_names = get_skill_tool_names(latest_message, embedding_model)
-        if skill_tool_names:
-            existing_names = {t["name"] for t in filtered_tools}
-            added = [t for t in tools if t["name"] in skill_tool_names and t["name"] not in existing_names]
-            if added:
-                filtered_tools.extend(added)
-                print(f"补入技能工具: {[t['name'] for t in added]}")
-
-    # ── 决策 ──
-    action_json_str = make_decision(chatHistory, filtered_tools, extra_context=extra_context)
-
-    # ── 缓存动作序列供保存 skill ──
-    try:
-        action_data = json.loads(action_json_str)
-        cache_action_sequence(action_data.get("actions", []))
-    except Exception:
-        pass
-
-    return action_json_str
-
-
-# ═══════════════════════════════════════════════
-# 内部函数: 工具筛选
-# ═══════════════════════════════════════════════
-
-def filter_tools(latest_messages, tools):
-    # 第 1 层：中文关键词预匹配
-    keyword_matched = keyword_match(latest_messages, tools)
-    if keyword_matched:
-        print(f"关键词预匹配命中: {[t['name'] for t in keyword_matched]}")
-
-    # 第 2 层：嵌入语义过滤
-    tool_descriptions = [tool['description'] for tool in tools]
-    tool_embeddings = embedding_model.encode(tool_descriptions)
-    latest_embedding = embedding_model.encode([latest_messages])[0]
-    similarities = cosine_similarity([latest_embedding], tool_embeddings)[0]
-    threshold = 0.3
-    embedding_matched = [
-        tools[i] for i in range(len(tools))
-        if similarities[i] > threshold
-    ]
-
-    # 合并 + 去重
-    seen = set()
-    merged = []
-    for t in keyword_matched + embedding_matched:
-        if t["name"] not in seen:
-            merged.append(t)
-            seen.add(t["name"])
-
-    # 始终保留 Chat
-    if "Chat" not in seen:
-        chat_tool = next((t for t in tools if t["name"] == "Chat"), None)
-        if chat_tool:
-            merged.append(chat_tool)
-            seen.add("Chat")
-
-    if not merged:
-        print("关键词 + 嵌入均未匹配，返回全部工具")
-        return tools
-
-    print(f"最终筛选出 {len(merged)} 个工具: {[t['name'] for t in merged]}")
-    return merged
+        print(f"[plan] 决策异常: {e}")
+        return json.dumps({"actions":[{"name":"Chat","args":{"message":"规划异常"}}],"continue":False})
+    return result_str
 
 
 @mcp.tool()
-def summarize(chatHistory: list) -> str:
-    """根据聊天历史生成自然语言总结，用于跨会话记忆。"""
+async def summarize(chatHistory: list) -> str:
     try:
         from LLMAgent import summarize_history
-        return summarize_history(chatHistory)
+        return await summarize_history(chatHistory)
     except Exception as e:
         return f"总结生成失败: {e}"
 
 
 @mcp.tool()
-def saveSkill(chatHistory, skill_name: str) -> str:
-    """根据聊天历史和技能名称生成并保存技能。"""
+async def saveSkill(chatHistory, skill_name: str) -> str:
     try:
         from LLMAgent import generate_skill
-        result = generate_skill(chatHistory, skill_name)
+        result = await generate_skill(chatHistory, skill_name)
         return check_save_skill(result)
     except Exception as e:
+        print(f"技能保存失败: {e}")
         return f"技能保存失败: {e}"
+
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http", host="127.0.0.1", port=8001)

@@ -11,10 +11,6 @@ from pydantic import BaseModel
 # ── 模块级状态 ──
 SKILLS_DIR: str = ""
 _skill_index: list[dict] = []         # 内存索引 [{name, description, actions, rules}]
-_last_action_sequence: list | None = None  # plan() 缓存的上一次动作序列
-
-# 保存触发词
-_SAVE_TRIGGER_KEYWORDS = {"保存", "存为", "记录", "存储"}
 
 
 class SkillConfig(BaseModel):
@@ -60,98 +56,49 @@ def _load_skill_index() -> None:
 
 
 # ═══════════════════════════════════════════════
-# 读 — 匹配 & 构建上下文
+# 读 — 列出 & 查询详情
 # ═══════════════════════════════════════════════
 
-def match_skills(message: str, embedding_model=None) -> list[dict]:
-    """匹配技能：第 1 层查名称关键词，第 2 层嵌入 description（需传入 embedding_model）。"""
-    if not message or not _skill_index:
-        return []
-    msg = message.strip()
-    # 去掉 "username: " 前缀
-    colon_idx = msg.find(': ')
-    if colon_idx > 0:
-        msg = msg[colon_idx + 2:]
-    msg_lower = msg.lower().strip()
-    matched = []
-    seen = set()
-
-    # 第 1 层：技能名称包含匹配
-    for skill in _skill_index:
-        sname = skill.get("name", "").lower()
-        if sname and sname in msg_lower:
-            print(f"  [skill] 名称匹配: '{msg_lower}' 包含 '{sname}'")
-            if skill["name"] not in seen:
-                matched.append(skill)
-                seen.add(skill["name"])
-
-    # 第 2 层：description 嵌入匹配（只对第一层没命中的跑，阈值 0.5）
-    unmatched = [s for s in _skill_index if s["name"] not in seen]
-    if unmatched and embedding_model:
-        try:
-            descs = [s.get("description", "") for s in unmatched]
-            desc_embs = embedding_model.encode(descs)
-            msg_emb = embedding_model.encode([msg_lower])[0]
-
-            from sklearn.metrics.pairwise import cosine_similarity
-            sims = cosine_similarity([msg_emb], desc_embs)[0]
-
-            scored = [(i, sims[i]) for i in range(len(sims)) if sims[i] > 0.5]
-            scored.sort(key=lambda x: x[1], reverse=True)
-
-            for idx, score in scored[:2]:
-                skill = unmatched[idx]
-                matched.append(skill)
-                seen.add(skill["name"])
-                print(f"  [skill] 嵌入匹配: '{message}' → {skill['name']} ({score:.3f})")
-        except Exception:
-            pass
-
-    return matched
+def list_all_skills() -> list[dict]:
+    """返回所有技能的名称和描述（供 LLM 第一轮查询用）。"""
+    return [{"name": s["name"], "description": s.get("description", "")} for s in _skill_index]
 
 
-def build_skill_context(message: str, embedding_model=None) -> str:
-    """构建技能上下文字符串供注入 LLM prompt。"""
-    matched_skills = match_skills(message, embedding_model=embedding_model)
-    if not matched_skills:
+def query_skill_detail(skill_name: str) -> dict | None:
+    """根据技能名称返回完整详情（供 LLM 第二轮查询用）。"""
+    for s in _skill_index:
+        if s["name"] == skill_name:
+            return s
+    return None
+
+
+def build_skill_context(skill_name: str, next_sequence_index: int = 0) -> str:
+    """构建单个技能的下一个子序列上下文，供 LLM 续行执行使用。"""
+    skill = query_skill_detail(skill_name)
+    if not skill:
         return ""
-    
-    skill_prompts = []
-    for skill in matched_skills:
-        s = SkillConfig(**skill)
-        prompt_text = (
-            f"技能开始\n"
-            f"  {s.name}: {s.description}\n"
-            f"  共{s.action_sequences_length}个动作子序列\n"
-            f"  执行顺序：\n"
-        )
-        for index in range(s.action_sequences_length):
-            seq = s.action_sequences[index]
-            step_num = seq.get("step", index) + 1
-            actions = seq.get("actions", [])
-            action_str = "->".join(str(a) for a in actions)
-            prompt_text += f"    子动作序列{step_num}: {action_str}\n"
-        prompt_text += "技能结束"
-        skill_prompts.append(prompt_text)
 
-    lines = [
-        f"⚠ 技能匹配: {len(matched_skills)} 个技能命中",
-        "\n".join(skill_prompts)
-    ]
+    s = SkillConfig(**skill)
+    if next_sequence_index >= s.action_sequences_length:
+        return ""
+
+    next_seq = s.action_sequences[next_sequence_index]
+    actions = next_seq.get("actions", [])
+    total = s.action_sequences_length
+    is_last = (next_sequence_index == total - 1)
+    lines = [f"技能 — {s.name}: {s.description}"]
+    lines.append(f"  子序列 {next_sequence_index + 1} / {total}")
+    lines.append("  动作: " + " -> ".join(str(a) for a in actions))
+    if is_last:
+        lines.append("  最后一个子序列，完成后结束。")
+    else:
+        lines.append("  后续还有子序列。")
 
     return "\n".join(lines)
 
 
-def get_skill_tool_names(message: str, embedding_model=None) -> set[str]:
-    """返回匹配技能中用到的所有工具名集合。"""
-    skills = match_skills(message, embedding_model)
-    names = set()
-    for s in skills:
-        for seq in s.get("action_sequences", []):
-            for action_name in seq.get("actions", []):
-                if isinstance(action_name, str):
-                    names.add(action_name)
-    return names
+
+
 
 
 # ═══════════════════════════════════════════════
@@ -193,6 +140,8 @@ def check_save_skill(llm_saveskill_output: str) -> str | None:
     
     # 强制转换 action_sequences_length 为 int和实际长度，避免LLM输出错误
     skill_config.action_sequences_length = len(skill_config.action_sequences)
+    if skill_config.action_sequences_length > 10:
+        raise ValueError(f"子序列数量 {skill_config.action_sequences_length} 超过上限 10")
     for seq in skill_config.action_sequences:
         # 强制设置 step 为实际索引，避免LLM输出错误
         seq["step"] = skill_config.action_sequences.index(seq)
@@ -201,11 +150,4 @@ def check_save_skill(llm_saveskill_output: str) -> str | None:
     return f"技能 {skill_config.name} 已保存成功"
 
 
-# ═══════════════════════════════════════════════
-# 缓存接口（plan 在返回前调用）
-# ═══════════════════════════════════════════════
 
-def cache_action_sequence(actions: list) -> None:
-    """缓存最近一次动作序列，供下次保存 skill 使用。"""
-    global _last_action_sequence
-    _last_action_sequence = actions

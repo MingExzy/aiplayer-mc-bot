@@ -5,7 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const { addToHistory, getWorldPath } = require('./History')
 const { initMCPSession, requestTaskPlan, handleMessage } = require('./MCP')
-const { GetBotTools,QueryTools } = require('./BotTools')
+
 const { normalizeActionList } = require('./user_utils')
 const {command_matches,processCommand} = require('./rules')
 
@@ -41,29 +41,34 @@ function initBot(botname) {
     bot.on('chat', async (username, message) => {
         if (username === bot.username) return
         addToHistory('player', `${username}: ${message}`)
+        bot.chat(`思考中...`)
         let keepPlanning = true
+        let activeSkillProgress = null
         while (keepPlanning) {
             try {
                 // 根据玩家消息分类工具集并请求计划
-                const tools = GetBotTools()
-                const plan = await requestTaskPlan(username, message, tools)
-                const actions = normalizeActionList(plan)
-                const lastAction = actions[actions.length - 1]
-                const isQueryTask = QueryTools.includes(lastAction.name)
+                const rawPlan = await requestTaskPlan(username, message, activeSkillProgress)
+                const actions = normalizeActionList(rawPlan)
+                const shouldContinue = rawPlan?.continue === true
+                activeSkillProgress = rawPlan?.skillProgress || null
 
-                // 将解析后的动作传给执行器（传递 isQueryTask）
-                const result = await handleMessage(bot, actions, isQueryTask)
-                if (isQueryTask&&result?.success) {
-                    // 查询完成，自动继续规划
-                    addToHistory("system", `查询完成，请继续执行玩家${username}请求: ${message}`)
+                // 执行动作
+                const result = await handleMessage(bot, actions)
+                if (shouldContinue && result?.success) {
+                    addToHistory("system", `当前动作序列执行完毕，继续任务，再次明确用户${username}需求：${message}`)
                 }
-                else{
-                    // 无查询动作 → 任务结束，跳出循环
+                else if (result?.success) {
+                    addToHistory("system", `整体任务已完成`)
+                    break
+                }
+                else {
+                    // 失败信息已由 TaskCompleteCheck 写入历史，直接退出
                     break
                 }
 
             } catch (err) {
                 console.error('处理聊天消息失败:', err)
+                // 异常信息已在 MCP/执行层记录，直接退出
                 break
             }
         }

@@ -55,7 +55,7 @@ async function chooseWorldBackground(){
 async function main() {
     const world = await chooseWorldBackground()
     console.log(`你选择了存档：${world}，正在启动 Bot...`)
-    history_path = path.join(world, "history.json")
+    history_path = path.resolve(worlds_path, world, "history.json")
     setWorldPath(history_path)
     await loadHistoryFromFile(history_path)
     Bot = initBot('AIPlayer')

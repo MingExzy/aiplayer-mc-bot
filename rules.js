@@ -1,4 +1,4 @@
-const { ExecuteAction, TaskCompleteCheck, SaveSkills } = require('./BotTools')
+const { ExecuteAction, TaskCompleteCheck, SaveSkill } = require('./BotTools')
 const { addToHistory } = require('./History')
 
 const command_matches ={
@@ -7,7 +7,7 @@ const command_matches ={
     "!状态":     { tool: "GetState",            needsArg: false },
     "!坐标":     { tool: "GetPosition",         needsArg: false },
     "!附近实体":  { tool: "GetAroundEntities",   needsArg: false },
-    "!保存技能":  { tool: "SaveSkills",          needsArg: true, directFunc: SaveSkills },
+    "!保存技能":  { tool: "SaveSkill",          needsArg: true, directFunc: SaveSkill },
 }
 
 
@@ -61,10 +61,10 @@ async function processCommand(bot, input) {
     try {
         const result = await ExecuteAction(bot, action)
         bot.chat(result.message)
-        await TaskCompleteCheck(bot, true, result.message, '没有下一步动作，整体任务已完成。')
+        await TaskCompleteCheck(bot, true, result.message, '当前动作序列执行完毕')
     } catch (err) {
         bot.chat(`快捷指令 ${input} 执行失败: ${err.message}`)
-        await TaskCompleteCheck(bot, false, err.message, '请回复 yes 重试')
+        await TaskCompleteCheck(bot, false, err.message, '请重试或继续输入其他内容。')
     }
 }
 

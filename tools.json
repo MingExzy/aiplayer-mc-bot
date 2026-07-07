@@ -1,0 +1,134 @@
+[
+  {
+    "name": "Chat",
+    "args": ["message"],
+    "class": "InteractWithPlayerTools",
+    "description": "Send a chat message to players — use when you want to talk, say, speak, reply, respond, or tell something to other players. message is the text content of the chat."
+  },
+  {
+    "name": "Move",
+    "args": ["direction", "blocks"],
+    "class": "BasicControlTools",
+    "description": "Move/walk/go in a direction for a certain number of blocks — use when a player tells you to move forward, backward, left, or right. direction must be forward, backward, left, or right; blocks must be an integer >= 0."
+  },
+  {
+    "name": "Jump",
+    "args": ["lastTime"],
+    "class": "BasicControlTools",
+    "description": "Make the bot jump, hop, or leap — use when a player says 'jump', 'jump up', 'hop', or 'leap over something'. lastTime is the duration of the jump in milliseconds，default is 5000."
+  },
+  {
+    "name": "Turn",
+    "args": ["yaw", "pitch"],
+    "class": "BasicControlTools",
+    "description": "Turn/rotate the bot's head to face a specific direction — use when a player says 'turn left/right', 'look south/west', 'face me', 'turn around', or 'look up/down'. yaw: -PI to PI (0=south, PI/2=west); pitch: -PI/2 to PI/2 (0=horizon, -PI/2=up, PI/2=down)."
+  },
+  {
+    "name": "Sneak",
+    "args": ["state"],
+    "class": "BasicControlTools",
+    "description": "Toggle sneaking/crouching mode — use when a player says 'sneak', 'crouch', 'stealth mode', or 'go quietly'. state can be 'on' (start sneaking) or 'off' (stop sneaking)."
+  },
+  {
+    "name": "run",
+    "args": ["state"],
+    "class": "BasicControlTools",
+    "description": "Toggle running/sprinting/dashing mode — use when a player says 'run', 'sprint', 'dash', 'go faster', or 'speed up'. state can be 'on' (start sprinting) or 'off' (stop sprinting)."
+  },
+  {
+    "name": "LookAt",
+    "args": ["x", "y", "z"],
+    "class": "BasicControlTools",
+    "description": "Look/stare/face towards a specific coordinate position — use when a player tells you to 'look at', 'stare at', or 'face towards' a location. x, y, z are the target coordinates."
+  },
+  {
+    "name": "MoveTo",
+    "args": ["x", "y", "z"],
+    "class": "BasicControlTools",
+    "description": "Walk/go/travel/pathfind to a specific coordinate location — use when a player says 'go to', 'walk to', 'head to', 'travel to', or 'come to' a certain place. x, y, z are the target coordinates."
+  },
+  {
+    "name": "EquipItemInHand",
+    "args": ["item"],
+    "class": "ItemControlTools",
+    "description": "Equip/wield/hold/take out an item from your inventory into your hand — use when a player says 'equip', 'hold', 'take out', 'wield', 'grab', or 'get your {item}'. item is the name of the item to equip (e.g. 'diamond_sword', 'pickaxe')."
+  },
+  {
+    "name": "UseItemInHand",
+    "args": [],
+    "class": "ItemControlTools",
+    "description": "Use/activate/interact with the item currently in your hand — use when a player says 'use', 'activate', 'right-click', or 'interact' with your held item."
+  },
+  {
+    "name": "ThrowItems",
+    "args": ["item", "count"],
+    "class": "ItemControlTools",
+    "description": "Throw/drop/toss/discard items from your inventory — use when a player says 'throw', 'drop', 'toss', 'discard', or 'get rid of'. item is the name of the item to throw, count is how many to throw, default is 1."
+  },
+  {
+    "name": "PlaceBlock",
+    "args": ["block", "x", "y", "z"],
+    "class": "InteractWithBlockTools",
+    "description": "Place/put/build/set down a block at a specific position — use when a player says 'place', 'put', 'build', 'set down', or 'put a block at'. Checks inventory first, then equips and places. block is the block name, x/y/z are coordinates."
+  },
+  {
+    "name": "BreakBlock",
+    "args": ["x", "y", "z"],
+    "class": "InteractWithBlockTools",
+    "description": "Break/mine/dig/destroy/remove a block at a specific position — use when a player says 'break', 'mine', 'dig', 'destroy', 'remove', or 'knock down' a block. x, y, z are the target coordinates."
+  },
+  {
+    "name": "GetPosition",
+    "args": [],
+    "class": "QueryTools",
+    "description": "Query where the bot currently is — use when a player asks 'where are you', 'your position', 'coordinates', 'location', 'where are you at', or 'what are your coordinates'."
+  },
+  {
+    "name": "GetState",
+    "args": [],
+    "class": "QueryTools",
+    "description": "Query the bot's current status — use when a player asks 'how are you', 'your health', 'your status', 'how much health', 'your hunger', 'are you okay', or 'condition'. Returns health and hunger values."
+  },
+  {
+    "name": "GetInventory",
+    "args": [],
+    "class": "QueryTools",
+    "description": "Query what the bot is carrying — use when a player asks 'what do you have', 'your items', 'your inventory', 'what's in your inventory', 'what are you carrying', or 'show me your items'."
+  },
+  {
+    "name": "GetItemInHand",
+    "args": [],
+    "class": "QueryTools",
+    "description": "Query what the bot is currently holding — use when a player asks 'what are you holding', 'what's in your hand', 'what item do you have', or 'show me your hand'. Returns item name, count, and whether it's a block."
+  },
+  {
+    "name": "GetAroundEntities",
+    "args": [],
+    "class": "QueryTools",
+    "description": "Query what's nearby the bot — use when a player asks 'what's around you', 'nearby entities', 'who's nearby', 'what do you see', 'are there any mobs', 'any players nearby', or 'scan surroundings'."
+  },
+  {
+    "name": "GetAroundNearestTargetBlocks",
+    "args": ["targetBlock"],
+    "class": "QueryTools",
+    "description": "Find/locate/search for the nearest blocks of a specific type within 32 blocks radius of the bot — use when a player asks 'find', 'locate', 'look for', 'where is', 'any {block} nearby', 'find me {block}', or 'search for {block}'. targetBlock is the block name (e.g. 'diamond_ore', 'iron_ore', 'tree')."
+  },
+  {
+    "name": "GetRecipesForItem",
+    "args": ["item"],
+    "class": "QueryTools",
+    "description": "Query how to craft/make/create an item — use when a player asks 'how to make', 'how to craft', 'recipe for', 'crafting recipe of', 'how do I create', 'make' ,or  'craft' an item. item is the name of the item (e.g. 'diamond_sword', 'pickaxe'). Returns the crafting recipe if it's a craftable item."
+  },
+  {
+    "name": "FollowPlayer",
+    "args": ["playerName", "state"],
+    "class": "AdvancedControlTools",
+    "description": "Follow/chase/stalk a specific player — use when a player says 'follow me', 'follow {playerName}', 'chase {playerName}', 'stalk {playerName}', or 'come with me'. playerName is the name of the player to follow. State can be 'on' (start following) or 'off' (stop following)."
+  },
+  {
+    "name": "CraftItem",
+    "args": ["item", "count"],
+    "class": "AdvancedControlTools",
+    "description": "Craft/make/create items without using the crafting table — use when a player says 'craft', 'make', 'create', or 'build' an item. item is the name of the item to craft (e.g. 'diamond_sword', 'pickaxe'); count is how many to craft (integer >= 0)."
+  }
+]

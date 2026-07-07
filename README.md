@@ -44,4 +44,4 @@ Node.js, Python, MCP Protocol, DeepSeek API, Mineflayer, FastMCP
 
 ## 项目状态
 
-核心功能已完成，可用于面试展示。正在开发：环境状态监测器。
+核心功能已完成，正在开发：环境状态监测器。

@@ -1,0 +1,6 @@
+{
+    "fastapi_url": "http://127.0.0.1:8000",
+    "debug_mode": false,
+    "auto_status_tools": ["GetState", "GetAroundBlocks"],
+    "host": "host.docker.internal"
+}

@@ -1,0 +1,7 @@
+.git
+node_modules
+Decision/__pycache__
+.env
+EembeddingModelFiles
+ItemsData
+*.txt

@@ -1,0 +1,16 @@
+{
+  "name": "转圈",
+  "description": "向前走2格，然后转动90度，重复4次，形成一个正方形路径。",
+  "action_sequences_length": 1,
+  "action_sequences": [
+    {
+      "step": 0,
+      "actions": [
+        "Move", "Turn",
+        "Move", "Turn",
+        "Move", "Turn",
+        "Move", "Turn"
+      ]
+    }
+  ]
+}

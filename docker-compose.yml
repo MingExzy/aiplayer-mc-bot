@@ -1,0 +1,26 @@
+version: '3'
+services:
+  control:
+    build:
+      context: .
+      dockerfile: Control/Dockerfile
+    container_name: control
+    environment:
+      - FASTAPI_URL=http://decision:8000
+    depends_on:
+      - decision
+    volumes:
+      - tools_data:/app/Control/tools.json
+  decision:
+    build:
+      context: .
+      dockerfile: Decision/Dockerfile
+    container_name: decision
+    env_file:
+      - .env
+    volumes:
+      - tools_data:/app/Control/tools.json
+      - skill_data:/app/Decision/skills
+volumes:
+  tools_data:
+  skill_data:

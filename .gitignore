@@ -8,7 +8,9 @@ Python/skills/
 test_plan.txt
 ppt_content.txt
 Control/test/test_runner.js
-*.txt
+面试准备.txt
+简历描述.txt
+知识点.txt
 # .gitignore
 .env
 test

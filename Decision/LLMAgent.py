@@ -1,13 +1,13 @@
 from openai import AsyncOpenAI,APIConnectionError, APITimeoutError, APIStatusError, APIError
 import json
-from utils import retry, trace_id_var, get_logger,log_llm_helper
+from Decision.utils import retry, trace_id_var, get_logger,log_llm_helper
 from Decision.LLMData import LLMResponse, LLMReflect,LLMGenerateSkill
 from jinja2 import Template
 from typing import Optional
 import datetime
 import uuid
-from config import settings
-import errors
+from .config import settings
+import Decision.errors as errors
 
 _prompts = None
 _logger = None
@@ -16,10 +16,13 @@ class LLMClient:
     def __init__(self, model_name: str, url: str, api_key: str, temperature: float) -> None:
         self.model_name: str = model_name
         self.url: str = url
-        self.client = AsyncOpenAI(api_key=api_key, base_url=url)
+        try:
+            self.client = AsyncOpenAI(api_key=api_key, base_url=url)
+        except Exception as e:
+            raise errors.LLMAPIError(f"LLM API 初始化失败: {e}") from e
         self.temperature: float = temperature
 
-    async def create_session(self,messages:list,res_format)->str:
+    async def create_session(self,messages:list,res_format = {"type": "text"})->str:
         try:
             response = await self.client.chat.completions.create(
                 model=self.model_name,

@@ -4,8 +4,8 @@ import os
 import contextvars
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from pythonjsonlogger import jsonlogger
-from errors import LLMParseError,LLMAPIError
+from pythonjsonlogger import json as jsonlogger
+from .errors import LLMParseError,LLMAPIError
 import datetime
 import uuid
 

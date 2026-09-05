@@ -13,4 +13,6 @@ Control/test/test_runner.js
 知识点.txt
 # .gitignore
 .env
+test_*
 test
+pytest.*

@@ -3,7 +3,7 @@ from pydantic import BaseModel,Field
 from typing import Optional
 import enum
 import os
-from config import settings
+from .config import settings
 
 prompts_path = settings.files.prompts_path
 prompts_names = [f[:-5] for f in os.listdir(prompts_path) if f.endswith(".yaml")]

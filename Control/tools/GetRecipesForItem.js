@@ -5,7 +5,9 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "GetRecipesForItem",
-  args: ["item"],
+  args: [
+    { name: "item", type: "string", required: true }
+  ],
   class: "QueryTools",
   description: "Query how to craft/make/create an item — use when a player asks 'how to make', 'how to craft', 'recipe for', 'crafting recipe of', 'how do I create', 'make' ,or  'craft' an item. item is the name of the item (e.g. 'diamond_sword', 'pickaxe'). Returns the crafting recipe if it's a craftable item.",
 

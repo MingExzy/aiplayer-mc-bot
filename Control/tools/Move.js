@@ -3,7 +3,10 @@
  */
 module.exports = {
   name: "Move",
-  args: ["direction", "blocks"],
+  args: [
+    { name: "direction", type: "string", required: true, enum: ["forward", "backward", "left", "right"] },
+    { name: "blocks", type: "integer", required: true }
+  ],
   class: "BasicControlTools",
   description: "Move/walk/go in a direction for a certain number of blocks — use when a player tells you to move forward, backward, left, or right. direction must be forward, backward, left, or right; blocks must be an integer >= 0.",
 

@@ -3,7 +3,9 @@
  */
 module.exports = {
   name: "run",
-  args: ["state"],
+  args: [
+    { name: "state", type: "string", required: true, enum: ["on", "off"] }
+  ],
   class: "BasicControlTools",
   description: "Toggle running/sprinting/dashing mode — use when a player says 'run', 'sprint', 'dash', 'go faster', or 'speed up'. state can be 'on' (start sprinting) or 'off' (stop sprinting).",
 

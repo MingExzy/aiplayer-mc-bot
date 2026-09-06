@@ -5,7 +5,11 @@ const Vec3 = require('vec3')
 
 module.exports = {
   name: "BreakBlock",
-  args: ["x", "y", "z"],
+  args: [
+    { name: "x", type: "number", required: true },
+    { name: "y", type: "number", required: true },
+    { name: "z", type: "number", required: true }
+  ],
   class: "InteractWithBlockTools",
   description: "Break/mine/dig/destroy/remove a block at a specific position — use when a player says 'break', 'mine', 'dig', 'destroy', 'remove', or 'knock down' a block. x, y, z are the target coordinates.",
 

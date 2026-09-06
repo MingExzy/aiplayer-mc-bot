@@ -6,7 +6,12 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "PlaceBlock",
-  args: ["block", "x", "y", "z"],
+  args: [
+    { name: "block", type: "string", required: true },
+    { name: "x", type: "number", required: true },
+    { name: "y", type: "number", required: true },
+    { name: "z", type: "number", required: true }
+  ],
   class: "InteractWithBlockTools",
   description: "Place/put/build/set down a block at a specific position — use when a player says 'place', 'put', 'build', 'set down', or 'put a block at'. Checks inventory first, then equips and places. block is the block name, x/y/z are coordinates.",
 

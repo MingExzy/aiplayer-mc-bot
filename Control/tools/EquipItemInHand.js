@@ -5,7 +5,9 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "EquipItemInHand",
-  args: ["item"],
+  args: [
+    { name: "item", type: "string", required: true }
+  ],
   class: "ItemControlTools",
   description: "Equip/wield/hold/take out an item from your inventory into your hand — use when a player says 'equip', 'hold', 'take out', 'wield', 'grab', or 'get your {item}'. item is the name of the item to equip (e.g. 'diamond_sword', 'pickaxe').",
 

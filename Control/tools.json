@@ -2,9 +2,21 @@
   {
     "name": "BreakBlock",
     "args": [
-      "x",
-      "y",
-      "z"
+      {
+        "name": "x",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "y",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "z",
+        "type": "number",
+        "required": true
+      }
     ],
     "class": "InteractWithBlockTools",
     "description": "Break/mine/dig/destroy/remove a block at a specific position — use when a player says 'break', 'mine', 'dig', 'destroy', 'remove', or 'knock down' a block. x, y, z are the target coordinates."
@@ -12,7 +24,11 @@
   {
     "name": "Chat",
     "args": [
-      "message"
+      {
+        "name": "message",
+        "type": "string",
+        "required": true
+      }
     ],
     "class": "InteractWithPlayerTools",
     "description": "Send a chat message to players — use when you want to talk, say, speak, reply, respond, or tell something to other players. message is the text content of the chat."
@@ -20,8 +36,16 @@
   {
     "name": "CraftItem",
     "args": [
-      "item",
-      "count"
+      {
+        "name": "item",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "count",
+        "type": "integer",
+        "required": false
+      }
     ],
     "class": "AdvancedControlTools",
     "description": "Craft/make/create items without using the crafting table — use when a player says 'craft', 'make', 'create', or 'build' an item. item is the name of the item to craft (e.g. 'diamond_sword', 'pickaxe'); count is how many to craft (integer >= 0)."
@@ -29,7 +53,11 @@
   {
     "name": "EquipItemInHand",
     "args": [
-      "item"
+      {
+        "name": "item",
+        "type": "string",
+        "required": true
+      }
     ],
     "class": "ItemControlTools",
     "description": "Equip/wield/hold/take out an item from your inventory into your hand — use when a player says 'equip', 'hold', 'take out', 'wield', 'grab', or 'get your {item}'. item is the name of the item to equip (e.g. 'diamond_sword', 'pickaxe')."
@@ -37,8 +65,20 @@
   {
     "name": "FollowPlayer",
     "args": [
-      "playerName",
-      "state"
+      {
+        "name": "playerName",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "state",
+        "type": "string",
+        "required": true,
+        "enum": [
+          "on",
+          "off"
+        ]
+      }
     ],
     "class": "AdvancedControlTools",
     "description": "Follow/chase/stalk a specific player — use when a player says 'follow me', 'follow {playerName}', 'chase {playerName}', 'stalk {playerName}', or 'come with me'. playerName is the name of the player to follow. State can be 'on' (start following) or 'off' (stop following)."
@@ -58,7 +98,11 @@
   {
     "name": "GetAroundNearestTargetBlocks",
     "args": [
-      "targetBlock"
+      {
+        "name": "targetBlock",
+        "type": "string",
+        "required": true
+      }
     ],
     "class": "QueryTools",
     "description": "Find/locate/search for the nearest blocks of a specific type within 32 blocks radius of the bot — use when a player asks 'find', 'locate', 'look for', 'where is', 'any {block} nearby', 'find me {block}', or 'search for {block}'. targetBlock is the block name (e.g. 'diamond_ore', 'iron_ore', 'tree')."
@@ -78,7 +122,11 @@
   {
     "name": "GetRecipesForItem",
     "args": [
-      "item"
+      {
+        "name": "item",
+        "type": "string",
+        "required": true
+      }
     ],
     "class": "QueryTools",
     "description": "Query how to craft/make/create an item — use when a player asks 'how to make', 'how to craft', 'recipe for', 'crafting recipe of', 'how do I create', 'make' ,or  'craft' an item. item is the name of the item (e.g. 'diamond_sword', 'pickaxe'). Returns the crafting recipe if it's a craftable item."
@@ -92,7 +140,11 @@
   {
     "name": "Jump",
     "args": [
-      "lastTime"
+      {
+        "name": "lastTime",
+        "type": "integer",
+        "required": false
+      }
     ],
     "class": "BasicControlTools",
     "description": "Make the bot jump, hop, or leap — use when a player says 'jump', 'jump up', 'hop', or 'leap over something'. lastTime is the duration of the jump in milliseconds，default is 5000."
@@ -100,9 +152,21 @@
   {
     "name": "LookAt",
     "args": [
-      "x",
-      "y",
-      "z"
+      {
+        "name": "x",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "y",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "z",
+        "type": "number",
+        "required": true
+      }
     ],
     "class": "BasicControlTools",
     "description": "Look/stare/face towards a specific coordinate position — use when a player tells you to 'look at', 'stare at', or 'face towards' a location. x, y, z are the target coordinates."
@@ -110,8 +174,22 @@
   {
     "name": "Move",
     "args": [
-      "direction",
-      "blocks"
+      {
+        "name": "direction",
+        "type": "string",
+        "required": true,
+        "enum": [
+          "forward",
+          "backward",
+          "left",
+          "right"
+        ]
+      },
+      {
+        "name": "blocks",
+        "type": "integer",
+        "required": true
+      }
     ],
     "class": "BasicControlTools",
     "description": "Move/walk/go in a direction for a certain number of blocks — use when a player tells you to move forward, backward, left, or right. direction must be forward, backward, left, or right; blocks must be an integer >= 0."
@@ -119,9 +197,21 @@
   {
     "name": "MoveTo",
     "args": [
-      "x",
-      "y",
-      "z"
+      {
+        "name": "x",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "y",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "z",
+        "type": "number",
+        "required": true
+      }
     ],
     "class": "BasicControlTools",
     "description": "Walk/go/travel/pathfind to a specific coordinate location — use when a player says 'go to', 'walk to', 'head to', 'travel to', or 'come to' a certain place. x, y, z are the target coordinates."
@@ -129,10 +219,26 @@
   {
     "name": "PlaceBlock",
     "args": [
-      "block",
-      "x",
-      "y",
-      "z"
+      {
+        "name": "block",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "x",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "y",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "z",
+        "type": "number",
+        "required": true
+      }
     ],
     "class": "InteractWithBlockTools",
     "description": "Place/put/build/set down a block at a specific position — use when a player says 'place', 'put', 'build', 'set down', or 'put a block at'. Checks inventory first, then equips and places. block is the block name, x/y/z are coordinates."
@@ -140,7 +246,15 @@
   {
     "name": "run",
     "args": [
-      "state"
+      {
+        "name": "state",
+        "type": "string",
+        "required": true,
+        "enum": [
+          "on",
+          "off"
+        ]
+      }
     ],
     "class": "BasicControlTools",
     "description": "Toggle running/sprinting/dashing mode — use when a player says 'run', 'sprint', 'dash', 'go faster', or 'speed up'. state can be 'on' (start sprinting) or 'off' (stop sprinting)."
@@ -148,7 +262,15 @@
   {
     "name": "Sneak",
     "args": [
-      "state"
+      {
+        "name": "state",
+        "type": "string",
+        "required": true,
+        "enum": [
+          "on",
+          "off"
+        ]
+      }
     ],
     "class": "BasicControlTools",
     "description": "Toggle sneaking/crouching mode — use when a player says 'sneak', 'crouch', 'stealth mode', or 'go quietly'. state can be 'on' (start sneaking) or 'off' (stop sneaking)."
@@ -156,8 +278,16 @@
   {
     "name": "ThrowItems",
     "args": [
-      "item",
-      "count"
+      {
+        "name": "item",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "count",
+        "type": "integer",
+        "required": false
+      }
     ],
     "class": "ItemControlTools",
     "description": "Throw/drop/toss/discard items from your inventory — use when a player says 'throw', 'drop', 'toss', 'discard', or 'get rid of'. item is the name of the item to throw, count is how many to throw, default is 1."
@@ -165,8 +295,16 @@
   {
     "name": "Turn",
     "args": [
-      "yaw",
-      "pitch"
+      {
+        "name": "yaw",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "pitch",
+        "type": "number",
+        "required": true
+      }
     ],
     "class": "BasicControlTools",
     "description": "Turn/rotate the bot's head to face a specific direction — use when a player says 'turn left/right', 'look south/west', 'face me', 'turn around', or 'look up/down'. yaw: -PI to PI (0=south, PI/2=west); pitch: -PI/2 to PI/2 (0=horizon, -PI/2=up, PI/2=down)."

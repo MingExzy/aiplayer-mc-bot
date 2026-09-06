@@ -1,12 +1,19 @@
 from openai import AsyncOpenAI
-from pydantic import BaseModel,Field
-from typing import Optional
+from pydantic import BaseModel,Field,model_validator
+from typing import Optional,Any
 import enum
 import os
 from .config import settings
 
 prompts_path = settings.files.prompts_path
 prompts_names = [f[:-5] for f in os.listdir(prompts_path) if f.endswith(".yaml")]
+_tools_schema = []  # 工具 schema 缓存，避免重复读取文件
+
+
+def set_tools_schemas(tool_data):
+    global _tools_schema
+    _tools_schema = tool_data
+    return _tools_schema
 
 class FailureLabel(str, enum.Enum):
     LLM_DECISION_ORDER = "LLM_DECISION_ORDER_FAILURE"
@@ -19,7 +26,41 @@ class ActionSequence(BaseModel):
 
 class Step(BaseModel):
     name: str = Field(..., description="动作/工具/函数名称")
-    args:  Optional[dict[str, str]] = Field(..., description="动作参数")
+    args:  Optional[dict[str, Any]] = Field(..., description="动作参数")
+
+    @model_validator(mode="after")
+    def validate_args(self) -> Optional[dict[str, Any]]:
+        """验证动作参数是否符合预期格式，如果不符合则抛出异常"""
+        tool = next((tool for tool in _tools_schema if tool["name"] == self.name), None)
+        if tool is None:
+            raise ValueError(f"动作名称 '{self.name}' 不在工具列表中，请检查工具配置。")
+        params_schema = tool.get("args", [])
+        if not params_schema and self.args:
+            raise ValueError(f"动作 '{self.name}' 不需要参数，但提供了参数: {self.args}")
+        if params_schema and not self.args:
+            required_params = [param["name"] for param in params_schema if param.get("required", False)]
+            if required_params:
+                raise ValueError(f"动作 '{self.name}' 需要参数，但未提供参数。")
+        if params_schema and self.args:
+            for param_schema in params_schema:
+                param_name = param_schema["name"]
+                required = param_schema.get("required", False)
+                if param_name not in self.args:
+                    if required:
+                        raise ValueError(f"动作 '{self.name}' 缺少参数 '{param_name}'。")
+                    continue
+                arg = self.args[param_name]
+                ptype = param_schema.get("type")
+                enum_values = param_schema.get("enum",[])
+                if ptype == "number" and not isinstance(arg, (int, float)):
+                    raise ValueError(f"动作 '{self.name}' 的参数 '{param_name}' 应为数字类型，但提供了: {arg.__class__.__name__}")
+                if ptype == "string" and not isinstance(arg, str):
+                    raise ValueError(f"动作 '{self.name}' 的参数 '{param_name}' 应为字符串类型，但提供了: {arg.__class__.__name__}")
+                if ptype == "integer" and not isinstance(arg, int):
+                    raise ValueError(f"动作 '{self.name}' 的参数 '{param_name}' 应为整数类型，但提供了: {arg.__class__.__name__}")
+                if enum_values and arg not in enum_values:
+                    raise ValueError(f"动作 '{self.name}' 的参数 '{param_name}' 的值必须在 {enum_values} 中，但提供了: {arg}")
+        return self
 
 class SkillProgress(BaseModel):
     name: str = Field(..., description="技能名")

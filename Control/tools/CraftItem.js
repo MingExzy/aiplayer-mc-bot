@@ -5,7 +5,10 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "CraftItem",
-  args: ["item", "count"],
+  args: [
+    { name: "item", type: "string", required: true },
+    { name: "count", type: "integer", required: false }
+  ],
   class: "AdvancedControlTools",
   description: "Craft/make/create items without using the crafting table — use when a player says 'craft', 'make', 'create', or 'build' an item. item is the name of the item to craft (e.g. 'diamond_sword', 'pickaxe'); count is how many to craft (integer >= 0).",
 

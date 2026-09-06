@@ -5,7 +5,9 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "GetAroundNearestTargetBlocks",
-  args: ["targetBlock"],
+  args: [
+    { name: "targetBlock", type: "string", required: true }
+  ],
   class: "QueryTools",
   description: "Find/locate/search for the nearest blocks of a specific type within 32 blocks radius of the bot — use when a player asks 'find', 'locate', 'look for', 'where is', 'any {block} nearby', 'find me {block}', or 'search for {block}'. targetBlock is the block name (e.g. 'diamond_ore', 'iron_ore', 'tree').",
 

@@ -5,7 +5,9 @@ const { addToHistory } = require('../bot/history')
 
 module.exports = {
   name: "Jump",
-  args: ["lastTime"],
+  args: [
+    { name: "lastTime", type: "integer", required: false }
+  ],
   class: "BasicControlTools",
   description: "Make the bot jump, hop, or leap — use when a player says 'jump', 'jump up', 'hop', or 'leap over something'. lastTime is the duration of the jump in milliseconds，default is 5000.",
 

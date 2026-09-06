@@ -5,7 +5,11 @@ const { goals: { GoalBlock } } = require('mineflayer-pathfinder')
 
 module.exports = {
   name: "MoveTo",
-  args: ["x", "y", "z"],
+  args: [
+    { name: "x", type: "number", required: true },
+    { name: "y", type: "number", required: true },
+    { name: "z", type: "number", required: true }
+  ],
   class: "BasicControlTools",
   description: "Walk/go/travel/pathfind to a specific coordinate location — use when a player says 'go to', 'walk to', 'head to', 'travel to', or 'come to' a certain place. x, y, z are the target coordinates.",
 

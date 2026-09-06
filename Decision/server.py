@@ -1,9 +1,8 @@
 from LLMAgent import LLMClient,decide,reflect_on_failure,generate_skill
-import LLMAgent
-from LLMData import get_all_prompts
 import json
 import os
-from typing import Optional
+from typing import Optional,Any
+from Decision.LLMData import set_tools_schemas
 from skill_manager import init_skills, build_skill_context, check_save_skill, list_all_skills, query_skill_detail
 import datetime
 from utils import trace_id_var, get_logger,log_server_event
@@ -28,13 +27,6 @@ async def get_llm_client() -> LLMClient:
             raise RuntimeError(f"初始化 LLM 客户端失败: {e}") from e
     return _llm
 
-async def get_prompts() -> dict:
-    if LLMAgent._prompts is None:
-        try:
-            LLMAgent._prompts = get_all_prompts()
-        except Exception as e:
-            raise RuntimeError(f"加载 prompts 配置失败: {e}") from e
-    return LLMAgent._prompts
 
 async def init_server():
     global _tools_path, _tools_mtime, _tools_data, _skill_summaries, _logger
@@ -47,7 +39,6 @@ async def init_server():
         await _try_reload_tools()
         _skill_summaries = list_all_skills()
         _llm = await get_llm_client()  # 初始化 LLM 客户端
-        await get_prompts()  # 初始化 prompts 配置
         _logger.info(f"[server] 初始化完成，技能数量: {len(_skill_summaries)}，工具数量: {len(_tools_data)}",
                      extra={"event_type": "server_init",
                             "timestamp": datetime.datetime.now().isoformat(),
@@ -73,6 +64,7 @@ async def _try_reload_tools():
         with open(_tools_path, "r", encoding="utf-8") as f:
             _tools_data = json.load(f)
         _tools_mtime = mt
+        set_tools_schemas(_tools_data)  # 热更新后同步工具 schema，供 LLM 输出解析时校验
         return f"更新成功，工具数量: {len(_tools_data)}"
     return f"未检测到更新，工具数量: {len(_tools_data)}"
 

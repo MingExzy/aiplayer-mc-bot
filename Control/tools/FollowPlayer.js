@@ -5,7 +5,10 @@ const { goals: { GoalFollow } } = require('mineflayer-pathfinder')
 
 module.exports = {
   name: "FollowPlayer",
-  args: ["playerName", "state"],
+  args: [
+    { name: "playerName", type: "string", required: true },
+    { name: "state", type: "string", required: true, enum: ["on", "off"] }
+  ],
   class: "AdvancedControlTools",
   description: "Follow/chase/stalk a specific player — use when a player says 'follow me', 'follow {playerName}', 'chase {playerName}', 'stalk {playerName}', or 'come with me'. playerName is the name of the player to follow. State can be 'on' (start following) or 'off' (stop following).",
 

@@ -5,7 +5,11 @@ const Vec3 = require('vec3')
 
 module.exports = {
   name: "LookAt",
-  args: ["x", "y", "z"],
+  args: [
+    { name: "x", type: "number", required: true },
+    { name: "y", type: "number", required: true },
+    { name: "z", type: "number", required: true }
+  ],
   class: "BasicControlTools",
   description: "Look/stare/face towards a specific coordinate position — use when a player tells you to 'look at', 'stare at', or 'face towards' a location. x, y, z are the target coordinates.",
 

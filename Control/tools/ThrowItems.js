@@ -5,7 +5,10 @@ const mcData = require('minecraft-data')('1.21.1')
 
 module.exports = {
   name: "ThrowItems",
-  args: ["item", "count"],
+  args: [
+    { name: "item", type: "string", required: true },
+    { name: "count", type: "integer", required: false }
+  ],
   class: "ItemControlTools",
   description: "Throw/drop/toss/discard items from your inventory — use when a player says 'throw', 'drop', 'toss', 'discard', or 'get rid of'. item is the name of the item to throw, count is how many to throw, default is 1.",
 

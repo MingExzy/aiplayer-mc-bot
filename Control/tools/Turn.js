@@ -3,7 +3,10 @@
  */
 module.exports = {
   name: "Turn",
-  args: ["yaw", "pitch"],
+  args: [
+    { name: "yaw", type: "number", required: true },
+    { name: "pitch", type: "number", required: true }
+  ],
   class: "BasicControlTools",
   description: "Turn/rotate the bot's head to face a specific direction — use when a player says 'turn left/right', 'look south/west', 'face me', 'turn around', or 'look up/down'. yaw: -PI to PI (0=south, PI/2=west); pitch: -PI/2 to PI/2 (0=horizon, -PI/2=up, PI/2=down).",
 

@@ -3,7 +3,9 @@
  */
 module.exports = {
   name: "Sneak",
-  args: ["state"],
+  args: [
+    { name: "state", type: "string", required: true, enum: ["on", "off"] }
+  ],
   class: "BasicControlTools",
   description: "Toggle sneaking/crouching mode — use when a player says 'sneak', 'crouch', 'stealth mode', or 'go quietly'. state can be 'on' (start sneaking) or 'off' (stop sneaking).",
 

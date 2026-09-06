@@ -5,7 +5,9 @@ const { addToHistory } = require('../bot/history')
 
 module.exports = {
   name: "Chat",
-  args: ["message"],
+  args: [
+    { name: "message", type: "string", required: true }
+  ],
   class: "InteractWithPlayerTools",
   description: "Send a chat message to players — use when you want to talk, say, speak, reply, respond, or tell something to other players. message is the text content of the chat.",
 

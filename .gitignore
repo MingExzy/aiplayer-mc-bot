@@ -1,6 +1,7 @@
 node_modules/
 .vscode/
 .reasonix/
+.pytest_cache/
 Python/__pycache__/
 Python/logs/
 Python/skills/
@@ -16,3 +17,4 @@ Control/test/test_runner.js
 test_*
 test
 pytest.*
+RL

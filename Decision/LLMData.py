@@ -22,7 +22,7 @@ class FailureLabel(str, enum.Enum):
 
 class ActionSequence(BaseModel):
     step: int = Field(..., description="动作序列的步骤索引")
-    sub_action_seq: list[str] = Field(..., description="动作名称列表")
+    actions: list[str] = Field(..., description="动作名称列表")
 
 class Step(BaseModel):
     name: str = Field(..., description="动作/工具/函数名称")
@@ -81,19 +81,3 @@ class LLMGenerateSkill(BaseModel):
     description: str = Field(..., description="技能描述",lt=200)
     action_sequences_length: int = Field(..., description="总的子动作序列个数")
     action_sequences: list[ActionSequence] = Field(..., description="动作序列列表，每个元素包含 step 和 actions 字段")
-
-
-def get_prompts_from_yaml(yaml_path: str) -> dict:
-    """从 YAML 文件中读取 prompts 配置"""
-    import yaml
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data
-
-
-def get_all_prompts() -> dict:
-    """根据提示名称列表获取所有提示配置"""
-    prompts = {}
-    for name in prompts_names:
-        prompts[name] = get_prompts_from_yaml(os.path.join(prompts_path, f"{name}.yaml"))["template"]
-    return prompts

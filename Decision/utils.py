@@ -18,7 +18,7 @@ prompts_names = [f[:-5] for f in os.listdir(prompts_path) if f.endswith(".yaml")
 
 
 def get_logger(name: str, log_path: str, level: str = "INFO",
-               backup_count: int = 7, with_stream: bool = False) -> logging.Logger:
+               backup_count: int = 7) -> logging.Logger:
     """统一的 logger 工厂：JSON 格式 + 按天轮转文件，可选控制台输出。幂等，重复调用返回同一 logger。"""
     logger = logging.getLogger(name)
     if logger.handlers:
@@ -30,10 +30,6 @@ def get_logger(name: str, log_path: str, level: str = "INFO",
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    if with_stream:
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-        logger.addHandler(stream_handler)
     return logger
 
 
